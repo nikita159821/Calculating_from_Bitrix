@@ -58,6 +58,7 @@
     </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.3/xlsx.full.min.js"></script>
   <script>
     let processedData = null; // Сохранение обработанных данных
 
@@ -107,24 +108,38 @@
             const viewCount = parseFloat(row['Количество покупок ( не трогать )']);
             const purchaseCount = parseFloat(row['Количество просмотров ( не трогать )']);
             const stockCount = parseFloat(row['Кол-во в МСК']);
-            const productName = row['Название товара'] || ''; // Получаем название товара или пустую строку, если поле отсутствует
+            const productName = row['Название товара'] || '';
+            let category = row['Категория'] || '';
+            if (typeof category === 'string' && category.trim() !== '') {
+              category = category.trim(); // Удаляем лишние пробелы
+            } else {
+              category = 'Без категории'; // Устанавливаем дефолтное значение
+            }
 
             return {
               'ID': index + 1,
               'Название товара': productName,
+              'Категория': category,
               'Количество покупок ( не трогать )': isNaN(viewCount) ? 0 : viewCount,
               'Количество просмотров ( не трогать )': isNaN(purchaseCount) ? 0 : purchaseCount,
               'Кол-во в МСК': isNaN(stockCount) ? 0 : stockCount,
               'Популярность': getPurchaseCoeff(viewCount) + getViewCoeff(purchaseCount),
               'Запас МСК': getStockCoeff(viewCount),
-
               'ИТОГ': getPurchaseCoeff(viewCount) + getViewCoeff(purchaseCount) + getStockCoeff(viewCount),
               'Порядковый номер': 0,
             };
           });
 
           // Сортировка по убыванию "ИТОГ"
-          df.sort((a, b) => b.ИТОГ - a.ИТОГ);
+          df.sort((a, b) => {
+            if (a.Категория.includes('Конфигурации') && !b.Категория.includes('Конфигурации')) {
+              return 1; // Если a содержит "Конфигурации", а b - нет, то b будет выше в списке
+            } else if (!a.Категория.includes('Конфигурации') && b.Категория.includes('Конфигурации')) {
+              return -1; // Если b содержит "Конфигурации", а a - нет, то a будет выше в списке
+            } else {
+              return b.ИТОГ - a.ИТОГ; // Сортировка по убыванию "ИТОГ"
+            }
+          });
 
           // Установка значения "ID" и "Порядковый номер" в порядке убывания
           df.forEach((row, index) => {
@@ -200,7 +215,5 @@
       errorModal.style.display = 'none';
     }
   </script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </body>
 </html>
-
