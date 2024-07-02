@@ -91,81 +91,83 @@
     };
 
     function processExcelFile() {
-      const file = document.getElementById('excelFile').files[0];
-      const fileName = file.name.toLowerCase();
-      if (!fileName.endsWith('.xls') && !fileName.endsWith('.xlsx')) {
-        showErrorModal();
-        return;
-      }
+  const file = document.getElementById('excelFile').files[0];
+  if (!file) {
+    showErrorModal();
+    return;
+  }
 
-      const reader = new FileReader();
+  const fileName = file.name.toLowerCase();
+  if (!fileName.endsWith('.xls') && !fileName.endsWith('.xlsx')) {
+    showErrorModal();
+    return;
+  }
 
-      reader.onload = (event) => {
-        const data = event.target.result;
+  const reader = new FileReader();
 
-        try {
-          // Использование библиотеки XLSX для работы с Excel
-          const workbook = XLSX.read(data, { type: 'binary' });
-          const sheetName = workbook.SheetNames[0]; // Используем первый лист
-          const worksheet = workbook.Sheets[sheetName];
-          const excelData = XLSX.utils.sheet_to_json(worksheet);
+  reader.onload = (event) => {
+    const data = event.target.result;
 
-          // Обработка данных, аналогично Python-коду
-          const df = excelData.map((row, index) => {
-            const viewCount = parseFloat(row['Количество покупок ( не трогать )']);
-            const purchaseCount = parseFloat(row['Количество просмотров ( не трогать )']);
-            const stockCount = parseFloat(row['Кол-во в МСК']);
-            const productName = row['Название товара'] || '';
-            let category = row['Категория'] || '';
-            if (typeof category === 'string' && category.trim() !== '') {
-              category = category.trim(); // Удаляем лишние пробелы
-            } else {
-              category = 'Без категории'; // Устанавливаем дефолтное значение
-            }
-    return {
-              'ID': index + 1,
-              'Название товара': productName,
-              'Категория': category,
-              'Количество покупок ( не трогать )': isNaN(viewCount) ? 0 : viewCount,
-              'Количество просмотров ( не трогать )': isNaN(purchaseCount) ? 0 : purchaseCount,
-              'Кол-во в МСК': isNaN(stockCount) ? 0 : stockCount,
-              'Популярность': getPurchaseCoeff(viewCount) + getViewCoeff(purchaseCount),
-              'Запас МСК': getStockCoeff(viewCount),
-              'ИТОГ': getPurchaseCoeff(viewCount) + getViewCoeff(purchaseCount) + getStockCoeff(viewCount),
-              'Порядковый номер': 0,
-            };
-          });
+    try {
+      // Использование библиотеки XLSX для работы с Excel
+      const workbook = XLSX.read(data, { type: 'binary' });
+      const sheetName = workbook.SheetNames[0]; // Используем первый лист
+      const worksheet = workbook.Sheets[sheetName];
+      const excelData = XLSX.utils.sheet_to_json(worksheet);
 
-          // Сортировка по убыванию "ИТОГ"
-          df.sort((a, b) => {
-            if (a.Категория.includes('Конфигурации') && !b.Категория.includes('Конфигурации')) {
-              return 1; // Если a содержит "Конфигурации", а b - нет, то b будет выше в списке
-            } else if (!a.Категория.includes('Конфигурации') && b.Категория.includes('Конфигурации')) {
-              return -1; // Если b содержит "Конфигурации", а a - нет, то a будет выше в списке
-            } else {
-              return b.ИТОГ - a.ИТОГ; // Сортировка по убыванию "ИТОГ"
-            }
-          });
+      // Обработка данных, аналогично Python-коду
+      const df = excelData.map((row, index) => {
+        const viewCount = parseFloat(row['Количество покупок ( не трогать )']),
+          purchaseCount = parseFloat(row['Количество просмотров ( не трогать )']),
+          stockCount = parseFloat(row['Кол-во в МСК']);
+        const productName = row['Название товара'] || '',
+          category = (row['Категория'] || '').trim() || 'Без категории';
+        const id = row['ID'] || index + 1;
 
-          // Установка значения "ID" и "Порядковый номер" в порядке убывания
-          df.forEach((row, index) => {
-            row['ID'] = df.length - index;
-            row['Порядковый номер'] = df.length - index;
-          });
+        return {
+          'ID': id,
+          'Название товара': productName,
+          'Категория': category,
+          'Количество покупок ( не трогать )': isNaN(viewCount) ? 0 : viewCount,
+          'Количество просмотров ( не трогать )': isNaN(purchaseCount) ? 0 : purchaseCount,
+          'Кол-во в МСК': isNaN(stockCount) ? 0 : stockCount,
+          'Популярность': getPurchaseCoeff(viewCount) + getViewCoeff(purchaseCount),
+          'Запас МСК': getStockCoeff(viewCount),
+          'ИТОГ': getPurchaseCoeff(viewCount) + getViewCoeff(purchaseCount) + getStockCoeff(viewCount),
+          'Порядковый номер': 0,
+        };
+      });
 
-          // Отображение результата
-          displayTable(df);
-
-          // Сохранение обработанных данных
-          processedData = df;
-        } catch (error) {
-          console.error('Error processing Excel file:', error);
-          showErrorModal();
+      // Сортировка по убыванию "ИТОГ"
+      df.sort((a, b) => {
+        if (a.Категория.includes('Конфигурации') && !b.Категория.includes('Конфигурации')) {
+          return 1; // Если a содержит "Конфигурации", а b - нет, то b будет выше в списке
+        } else if (!a.Категория.includes('Конфигурации') && b.Категория.includes('Конфигурации')) {
+          return -1; // Если b содержит "Конфигурации", а a - нет, то a будет выше в списке
+        } else {
+          return b.ИТОГ - a.ИТОГ; // Сортировка по убыванию "ИТОГ"
         }
-      };
+      });
 
-      reader.readAsBinaryString(file);
+      // Установка значения "Порядковый номер" в порядке убывания
+      df.forEach((row, index) => {
+        row['Порядковый номер'] = df.length - index;
+      });
+
+      // Отображение результата
+      displayTable(df);
+
+      // Сохранение обработанных данных
+      processedData = df;
+    } catch (error) {
+      console.error('Error processing Excel file:', error);
+      showErrorModal();
     }
+  };
+
+  reader.readAsBinaryString(file);
+}
+
 
     function displayTable(data) {
       const resultDiv = document.getElementById('result');
